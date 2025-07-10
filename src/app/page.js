@@ -57,17 +57,17 @@ function MainContent({ clientRef }) {
 				return;
 			case "player_joined":
 				console.log("player_joined");
-				setPlayers(players.concat([msg.username]));
+				setPlayers(players => [...players, msg.username]);
 				return;
 			case "chat":
-				setChatMessages(chatMessages.concat([msg.content]));
+				setChatMessages(chatMessages => [...chatMessages, msg.content]);
 				return;
 			case "start_game":
 				setStatus(Status.GAME);
 				break;
 			}
 		};
-	}, [status, login, players, chatMessages]);
+	}, []);
 	switch (status) {
 	case Status.START:
 		return (
