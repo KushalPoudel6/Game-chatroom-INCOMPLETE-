@@ -1,2 +1,2 @@
 #!/bin/bash
-npm run dev & python3 server/main.py
+(cd frontend && npm run dev) & python3 backend/main.py

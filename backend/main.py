@@ -90,6 +90,7 @@ async def join(code, socket, username):
     await lobby(l, player_index)
 
 async def route(socket):
+    print("[Game server] A client has connected.", flush=True)
     async for json_string in socket:
         print("Received request:")
         print(json_string)
@@ -102,8 +103,9 @@ async def route(socket):
                 await join(req["code"], socket, req["username"])
 
 async def main():
-    async with serve(route, "localhost", 8080) as server:
+    async with serve(route, "0.0.0.0", 8080) as server:
         await server.serve_forever()
 
 if __name__ == "__main__":
+    print("[Game server] Starting...", flush=True)
     asyncio.run(main())
