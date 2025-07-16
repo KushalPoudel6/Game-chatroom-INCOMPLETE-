@@ -95,7 +95,7 @@ async def lobby(l, player_index):
             chopsticks.start(l)
             # Now leave the lobby loop and enter the game loop
             local_msg = json.dumps({ "type": "local_start_chopsticks" })
-            local_broadcast(l, local_msg)
+            l.local_broadcast(local_msg)
             return await chopsticks.run(l, player_index)
         elif msg["type"] == "local_start_chopsticks" and player_index != HOST_INDEX:
             return await chopsticks.run(l, player_index)
