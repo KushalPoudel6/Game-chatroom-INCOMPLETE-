@@ -76,11 +76,11 @@ async def update(l):
             l.game.ball_vel_y += l.game.player_vel_y[1] * influence
 
         if ball_right >= 1.0:
-            print("player1 point")
+            print("player1 point", flush=True)
             # TODO
             l.game.reset(1)
         elif ball_left <= -1.0:
-            print("player2 point")
+            print("player2 point", flush=True)
             # TODO
             l.game.reset(0)
 
