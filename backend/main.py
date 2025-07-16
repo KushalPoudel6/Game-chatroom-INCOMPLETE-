@@ -4,6 +4,7 @@ from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError
 import json
 import secrets
 import pong
+import chopsticks
 
 HOST_INDEX = 0
 LOBBIES = {}
@@ -89,6 +90,15 @@ async def lobby(l, player_index):
             pong.start(l)
         elif msg["type"] == "local_start_game":
             await pong.run(l, player_index)
+        # Host starts the game and then hands off into chopsticks.run()
+        elif msg["type"] == "start_chopsticks" and player_index == HOST_INDEX:
+            chopsticks.start(l)
+            # Now leave the lobby loop and enter the game loop
+            local_msg = json.dumps({ "type": "local_start_chopsticks" })
+            local_broadcast(l, local_msg)
+            return await chopsticks.run(l, player_index)
+        elif msg["type"] == "local_start_chopsticks" and player_index != HOST_INDEX:
+            return await chopsticks.run(l, player_index)
 
 async def create(socket, username):
     code = secrets.token_urlsafe(12)

@@ -1,13 +1,15 @@
 "use client"
 import { useState, useEffect, useRef } from "react";
 import { Pong } from "./pong.js";
+import { Chopsticks } from "./chopsticks.js";
 
 const Status = Object.freeze({
-	START:		0,
-	CREATE:		1,
-	JOIN:		2,
-	LOBBY:		3,
-	GAME_PONG:	4,
+	START:				0,
+	CREATE:				1,
+	JOIN:				2,
+	LOBBY:				3,
+	GAME_PONG:			4,
+	GAME_CHOPSTICKS:	5,
 });
 
 export default function Home() {
@@ -39,9 +41,12 @@ function MainContent({ clientRef }) {
 	const [login, setLogin] = useState({ code: null, username: null });
 	const [players, setPlayers] = useState(null);
 	const [chatMessages, setChatMessages] = useState(null);
+	const [chopsticks, setChopsticks] = useState(null);
+
 	useEffect(() => {
 		clientRef.current.socket.onmessage = (event) => {
 			let msg = JSON.parse(event.data);
+			console.log("Message recieved: ", msg);
 			switch (msg.type) {
 			case "create_success":
 				setLogin({
@@ -77,6 +82,7 @@ function MainContent({ clientRef }) {
 					--clientRef.current.playerIndex;
 				}
 				setPlayers(players => players.filter((username) => username === msg.username));
+
 				return;
 			case "chat":
 				setChatMessages(chatMessages => [...chatMessages, msg.content]);
@@ -84,6 +90,23 @@ function MainContent({ clientRef }) {
 			case "start_game":
 				setStatus(Status.GAME_PONG);
 				return;
+			case "start_chopsticks":
+				setChopsticks({
+					game_info: msg.game_info,
+            		turn:      msg.turn,
+            		event:     msg.event || null,
+            		winner:    msg.winner || null,
+				});
+				setStatus(Status.GAME_CHOPSTICKS);
+				return;
+			case "chopsticks_move":
+				setChopsticks({
+            		game_info: msg.game_info,
+            		turn:      msg.turn,
+            		event:     msg.event,
+            		winner:    msg.winner || null,
+          		});
+          	return;
 			}
 		};
 	}, []);
@@ -103,6 +126,8 @@ function MainContent({ clientRef }) {
 		return <Lobby clientRef={clientRef} login={login} players={players} chatMessages={chatMessages} />;
 	case Status.GAME_PONG:
 		return <Pong clientRef={clientRef} />;
+	case Status.GAME_CHOPSTICKS:
+		return <Chopsticks clientRef={clientRef} chopsticks={chopsticks} players={players} />;
 	}
 }
 
@@ -160,10 +185,17 @@ function Lobby({ clientRef, login, players, chatMessages }) {
 		};
 		clientRef.current.socket.send(JSON.stringify(msg));
 	}
+	function startChopsticks() {
+		let msg = {
+			type:	"start_chopsticks",
+		};
+		clientRef.current.socket.send(JSON.stringify(msg));
+	}
 	let isHost = login.username === players[0];
 	return (
 		<div>
 			{isHost && <button onClick={() => startGame()}>START GAME</button>}
+			{isHost && <button onClick={() => startChopsticks()}>START CHOPSTICKS</button>}
 			<h2>In lobby. Code is: {login.code}</h2>
 			<h2>Your username is: {login.username}</h2>
 			<h2>Players in the lobby:</h2>
