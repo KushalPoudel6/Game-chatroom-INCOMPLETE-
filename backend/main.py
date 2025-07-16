@@ -1,5 +1,6 @@
 import asyncio
 from websockets.asyncio.server import broadcast, serve
+from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError
 import json
 import secrets
 import pong
@@ -18,11 +19,35 @@ class Lobby:
         self.connected = [host_socket]
         self.players = [Player(host_username)]
 
+    def local_broadcast(self, msg):
+        for player in self.players:
+            player.local_msg = msg
+
     # Returns player_index
     def add_player(self, socket, username):
-        self.connected.append(socket)
         self.players.append(Player(username))
-        return len(self.connected) - 1
+        msg = json.dumps({
+            "type":     "player_joined",
+            "username": username,
+        })
+        broadcast(self.connected, msg)
+        player_index = len(self.connected)
+        self.connected.append(socket)
+        return player_index
+
+    def remove_player(self, player_index):
+        self.connected.pop(player_index)
+        username = self.players.pop(player_index).username
+        msg = json.dumps({
+            "type":     "player_left",
+            "username": username,
+        })
+        broadcast(self.connected, msg)
+        msg = json.dumps({
+            "type":         "local_player_left",
+            "player_index": player_index,
+        })
+        self.local_broadcast(msg)
 
     def usernames(self):
         return [x.username for x in self.players]
@@ -42,20 +67,25 @@ async def select_message(l, player_index):
         except TimeoutError:
             pass
 
-def local_broadcast(l, msg):
-    for player in l.players:
-        player.local_msg = msg
-
 async def lobby(l, player_index):
     while True:
-        json_string = await select_message(l, player_index)
+        try:
+            json_string = await select_message(l, player_index)
+        except (ConnectionClosedOK, ConnectionClosedError):
+            print("[Game server] A client has disconnected (in lobby()).", flush=True)
+            l.remove_player(player_index)
+            return
+
         msg = json.loads(json_string)
-        if msg["type"] == "chat":
+        if msg["type"] == "local_player_left":
+            if player_index > msg["player_index"]:
+                player_index -= 1
+        elif msg["type"] == "chat":
             broadcast(l.connected, json_string)
         elif msg["type"] == "start_game" and player_index == HOST_INDEX:
             broadcast(l.connected, json_string)
             local_msg = json.dumps({ "type": "local_start_game" })
-            local_broadcast(l, local_msg)
+            l.local_broadcast(local_msg)
             pong.start(l)
         elif msg["type"] == "local_start_game":
             await pong.run(l, player_index)
@@ -68,17 +98,32 @@ async def create(socket, username):
         "code":     code,
         "username": username,
     })
-    await socket.send(resp)
+    try:
+        await socket.send(resp)
+    except (ConnectionClosedOK, ConnectionClosedError):
+        print("[Game server] A client has disconnected (in create()).", flush=True)
+        del(LOBBIES[code])
+        return
     await lobby(LOBBIES[code], HOST_INDEX)
 
+# TODO: probably need a mutex
 async def join(code, socket, username):
-    l = LOBBIES[code]
-    # TODO: handle invalid code
-    msg = json.dumps({
-        "type":     "player_joined",
-        "username": username,
-    })
-    broadcast(l.connected, msg)
+    try:
+        l = LOBBIES[code]
+    except KeyError:
+        msg = json.dumps({ "type": "unknown_code" })
+        try:
+            await socket.send(msg)
+        except (ConnectionClosedOK, ConnectionClosedError):
+            print("[Game server] A client has disconnected (in join()).", flush=True)
+        return
+    if username in l.usernames():
+        msg = json.dumps({ "type": "name_taken" })
+        try:
+            await socket.send(msg)
+        except (ConnectionClosedOK, ConnectionClosedError):
+            print("[Game server] A client has disconnected (in join()).", flush=True)
+        return
     player_index = l.add_player(socket, username)
     resp = json.dumps({
         "type":     "join_success",
@@ -86,21 +131,29 @@ async def join(code, socket, username):
         "username": username,
         "players":  l.usernames(),
     })
-    await socket.send(resp)
+    try:
+        await socket.send(resp)
+    except (ConnectionClosedOK, ConnectionClosedError):
+        print("[Game server] A client has disconnected (in join()).", flush=True)
+        l.remove_player(player_index)
+        return
     await lobby(l, player_index)
 
 async def route(socket):
     print("[Game server] A client has connected.", flush=True)
-    async for json_string in socket:
-        print("Received request:")
-        print(json_string)
-        # TODO: handle invalid json
-        req = json.loads(json_string)
-        match req["type"]:
-            case "create":
-                await create(socket, req["username"])
-            case "join":
-                await join(req["code"], socket, req["username"])
+    try:
+        async for json_string in socket:
+            print("Received request:", flush=True)
+            print(json_string, flush=True)
+            # TODO: handle invalid json
+            req = json.loads(json_string)
+            match req["type"]:
+                case "create":
+                    await create(socket, req["username"])
+                case "join":
+                    await join(req["code"], socket, req["username"])
+    except (ConnectionClosedOK, ConnectionClosedError):
+        print("[Game server] A client has disconnected (in route()).", flush=True)
 
 async def main():
     async with serve(route, "0.0.0.0", 8080) as server:

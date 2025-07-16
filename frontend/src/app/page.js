@@ -49,6 +49,7 @@ function MainContent({ clientRef }) {
 					username:	msg.username,
 				});
 				setPlayers([msg.username]);
+				clientRef.current.playerIndex = 0;
 				setChatMessages(["[SYSTEM] You just created a lobby."]);
 				setStatus(Status.LOBBY);
 				return;
@@ -62,10 +63,20 @@ function MainContent({ clientRef }) {
 				setChatMessages(["[SYSTEM] You just joined the lobby."]);
 				setStatus(Status.LOBBY);
 				return;
+			case "unknown_code":
+				// TODO: display an error
+				return;
+			case "name_taken":
+				// TODO: display an error
+				return;
 			case "player_joined":
-				console.log("player_joined");
 				setPlayers(players => [...players, msg.username]);
-				clientRef.current.playerIndex = 0;
+				return;
+			case "player_left":
+				if (clientRef.current.playerIndex > (players => players.indexOf(msg.username))) {
+					--clientRef.current.playerIndex;
+				}
+				setPlayers(players => players.filter((username) => username === msg.username));
 				return;
 			case "chat":
 				setChatMessages(chatMessages => [...chatMessages, msg.content]);
