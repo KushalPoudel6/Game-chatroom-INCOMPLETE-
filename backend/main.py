@@ -3,6 +3,7 @@ from websockets.asyncio.server import broadcast, serve
 import json
 import secrets
 import pong
+import chopsticks
 
 HOST_INDEX = 0
 LOBBIES = {}
@@ -50,6 +51,8 @@ async def lobby(l, player_index):
     while True:
         json_string = await select_message(l, player_index)
         msg = json.loads(json_string)
+        print("Msg recieved: ", end=" ", flush=True)
+        print(msg, flush=True)
         if msg["type"] == "chat":
             broadcast(l.connected, json_string)
         elif msg["type"] == "start_game" and player_index == HOST_INDEX:
@@ -59,6 +62,15 @@ async def lobby(l, player_index):
             pong.start(l)
         elif msg["type"] == "local_start_game":
             await pong.run(l, player_index)
+        # Host starts the game and then hands off into chopsticks.run()
+        elif msg["type"] == "start_chopsticks" and player_index == HOST_INDEX:
+            chopsticks.start(l)
+            # Now leave the lobby loop and enter the game loop
+            local_msg = json.dumps({ "type": "local_start_chopsticks" })
+            local_broadcast(l, local_msg)
+            return await chopsticks.run(l, player_index)
+        elif msg["type"] == "local_start_chopsticks" and player_index != HOST_INDEX:
+            return await chopsticks.run(l, player_index)
 
 async def create(socket, username):
     code = secrets.token_urlsafe(12)
