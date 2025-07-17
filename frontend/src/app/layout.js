@@ -1,5 +1,7 @@
+import './styles.css';
+
 export const metadata = {
-  title: "My web application",
+  title: "Nostalic Games",
   description: "Chat and play games online",
 };
 

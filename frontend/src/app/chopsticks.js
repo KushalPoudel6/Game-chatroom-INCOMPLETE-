@@ -40,11 +40,7 @@ export function Chopsticks({ clientRef, chopsticks, players }) {
 			{game_info.map((p, idx) => (
 				<div
 					key={idx}
-					style={{
-						padding: "0.5rem",
-						border: "1px solid gray",
-						backgroundColor: idx === turn ? "#f0f8ff" : "white",
-					}}
+					className={`player-hand ${idx === turn ? "current-turn" : ""}`}
 				>
 					<strong>{players[idx] ?? `Player ${idx}`}</strong>
 					<div>Left: {p.left} | Right: {p.right}</div>

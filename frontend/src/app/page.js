@@ -28,7 +28,7 @@ export default function Home() {
 	}, []);
 	return (
 		<>
-			<h1>My web application</h1>
+			<h1>Nostalic Games</h1>
 			<main>
 				<MainContent clientRef={clientRef} />
 			</main>
